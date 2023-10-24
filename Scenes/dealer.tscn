@@ -1,0 +1,14 @@
+[gd_scene load_steps=2 format=3 uid="uid://ci72ti34moy8i"]
+
+[ext_resource type="Script" path="res://scripts/dealer.gd" id="1_3byua"]
+
+[node name="Dealer" type="Control"]
+layout_mode = 3
+anchors_preset = 0
+script = ExtResource("1_3byua")
+
+[node name="Deck" type="Control" parent="."]
+layout_mode = 3
+anchors_preset = 0
+offset_right = 40.0
+offset_bottom = 40.0

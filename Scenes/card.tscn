@@ -1,0 +1,69 @@
+[gd_scene load_steps=2 format=3 uid="uid://bt3fllfciyen1"]
+
+[ext_resource type="Script" path="res://scripts/card.gd" id="1_8uyf2"]
+
+[node name="Card" type="Control"]
+layout_mode = 3
+anchors_preset = 0
+script = ExtResource("1_8uyf2")
+
+[node name="CardBorder" type="ColorRect" parent="."]
+layout_mode = 0
+offset_right = 125.0
+offset_bottom = 200.0
+color = Color(0.847059, 0.847059, 0.847059, 1)
+
+[node name="CardOutter" type="MarginContainer" parent="."]
+layout_mode = 0
+offset_right = 125.0
+offset_bottom = 200.0
+theme_override_constants/margin_left = 5
+theme_override_constants/margin_top = 5
+theme_override_constants/margin_right = 5
+theme_override_constants/margin_bottom = 5
+
+[node name="CardColor" type="ColorRect" parent="CardOutter"]
+layout_mode = 2
+color = Color(0.752941, 0.14902, 0.14902, 1)
+
+[node name="CardInner" type="VBoxContainer" parent="CardOutter"]
+layout_mode = 2
+
+[node name="TopSymbols" type="HBoxContainer" parent="CardOutter/CardInner"]
+layout_mode = 2
+size_flags_stretch_ratio = 0.0
+
+[node name="NumberLeft" type="Label" parent="CardOutter/CardInner/TopSymbols"]
+layout_mode = 2
+size_flags_horizontal = 2
+text = " # "
+
+[node name="SuitRight" type="Label" parent="CardOutter/CardInner/TopSymbols"]
+layout_mode = 2
+size_flags_horizontal = 10
+text = " $ "
+
+[node name="Number" type="CenterContainer" parent="CardOutter/CardInner"]
+layout_mode = 2
+size_flags_vertical = 3
+size_flags_stretch_ratio = 20.0
+
+[node name="Label" type="Label" parent="CardOutter/CardInner/Number"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 50
+text = "$#"
+
+[node name="BottomSybmols" type="HBoxContainer" parent="CardOutter/CardInner"]
+layout_mode = 2
+size_flags_vertical = 10
+size_flags_stretch_ratio = 0.0
+
+[node name="SuitLeft" type="Label" parent="CardOutter/CardInner/BottomSybmols"]
+layout_mode = 2
+size_flags_horizontal = 2
+text = " $ "
+
+[node name="NumberRight" type="Label" parent="CardOutter/CardInner/BottomSybmols"]
+layout_mode = 2
+size_flags_horizontal = 10
+text = " # "
