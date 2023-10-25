@@ -2,6 +2,11 @@ extends Control
 
 class_name Dealer
 
+signal send_playable_piles
+signal send_target_piles
+signal shared_piles_changed
+signal move_made
+
 const card_scene := preload("res://Scenes/card.tscn")
 const pile_scene := preload("res://Scenes/play_pile.tscn")
 
@@ -94,11 +99,19 @@ func card_interact(mouse_position:Vector2) -> void:
 							held_card = null
 							if stuck:
 								stuck = false
+							shared_piles_changed.emit()
 					'stacked':
 						if held_card.value_to_int() == target_pile.top_card.value_to_int() and !stuck:
 							target_pile.add_card(held_card)
 							holding_card = false
 							held_card = null
+
+func move_opponent_card(from_pile:PlayPile, to_pile:PlayPile):
+	var in_flight_card = from_pile.pop_card()
+	to_pile.add_card(in_flight_card)
+	if from_pile.has_cards():
+		from_pile.stack.front().reveale_card()
+	move_made.emit()
 
 func move_card() -> void:
 	if held_card and holding_card:
@@ -171,7 +184,7 @@ func set_up_game() -> void:
 	clear_game()
 	var temp_cards:Array = [] + shuffle_deck(cards)
 
-	var opponent_solatare = [play_piles['opponent_sol_one'],play_piles['opponent_sol_two'],play_piles['opponent_sol_three'],play_piles['opponent_sol_four'],play_piles['opponent_sol_five'],]
+	var opponent_solatare = [play_piles['opponent_sol_one'],play_piles['opponent_sol_two'],play_piles['opponent_sol_three'],play_piles['opponent_sol_four'],play_piles['opponent_sol_five']]
 	var card_count:int = 5
 	for pile in opponent_solatare:
 		for i in range(card_count):
@@ -179,7 +192,7 @@ func set_up_game() -> void:
 		card_count -= 1
 		pile.top_card.reveale_card()
 
-	var player_solatare = [play_piles['player_sol_one'],play_piles['player_sol_two'],play_piles['player_sol_three'],play_piles['player_sol_four'],play_piles['player_sol_five'],]
+	var player_solatare = [play_piles['player_sol_one'],play_piles['player_sol_two'],play_piles['player_sol_three'],play_piles['player_sol_four'],play_piles['player_sol_five']]
 	card_count = 1
 	for pile in player_solatare:
 		for i in range(card_count):
@@ -208,3 +221,11 @@ func release_target_pile() -> void:
 func clear_game() -> void:
 	for pile in play_piles.values():
 		pile.empty()
+
+func show_playable_piles() -> void:
+	var playble_piles:Array = [play_piles['opponent_sol_one'],play_piles['opponent_sol_two'],play_piles['opponent_sol_three'],play_piles['opponent_sol_four'],play_piles['opponent_sol_five']]
+	send_playable_piles.emit(playble_piles)
+
+func show_target_piles() -> void:
+	var target_piles:Array = [play_piles['opponent_pile'],play_piles['player_pile']]
+	send_target_piles.emit(target_piles)
