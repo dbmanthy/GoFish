@@ -202,7 +202,7 @@ func shuffle_deck(deck:Array) -> Array:
 		deck[j] = temp
 	return deck
 
-#todo ajsut set_up_game for varying card numbers ie player_card_count:int, opponent_card_count:int
+#todo ajsut set_up_game for varying card numbers irplayer_card_count:int, opponent_card_count:int
 func set_up_game() -> void:
 	clear_game()
 	var temp_cards:Array = [] + shuffle_deck(cards)
@@ -293,3 +293,11 @@ func in_win_state() -> bool:
 
 func round_won(player:String) -> void:
 	print(player +' WON')
+	set_up_game(tally_cards(false), tally_cards(true))
+
+func tally_cards(is_opponent_pile:bool) -> int:
+	var card_tally:int = 0
+	for pile in play_piles:
+		if pile.opponent_pile == is_opponent_pile:
+			card_tally += pile.stack.size()
+	return card_tally
