@@ -6,6 +6,7 @@ signal send_playable_piles
 signal send_target_piles
 signal shared_piles_changed
 signal move_made
+signal card_animation_complete
 
 const card_scene := preload("res://Scenes/card.tscn")
 const pile_scene := preload("res://Scenes/play_pile.tscn")
@@ -107,10 +108,15 @@ func card_interact(mouse_position:Vector2) -> void:
 							held_card = null
 
 func move_opponent_card(from_pile:PlayPile, to_pile:PlayPile):
-	var in_flight_card = from_pile.pop_card()
+	var in_flight_card:Card = from_pile.pop_card()
+	var from_position:Vector2 = in_flight_card.position
 	to_pile.add_card(in_flight_card)
+	animate_card(in_flight_card, from_position, in_flight_card.position)
 	if from_pile.has_cards():
 		from_pile.stack.front().reveale_card()
+	var rng:RandomNumberGenerator = RandomNumberGenerator.new()
+	await get_tree().create_timer(rng.randf_range(0,3.2)).timeout# opponents "think time"
+	to_pile.set_card_display_order()
 	move_made.emit()
 
 func move_card() -> void:
@@ -229,3 +235,13 @@ func show_playable_piles() -> void:
 func show_target_piles() -> void:
 	var target_piles:Array = [play_piles['opponent_pile'],play_piles['player_pile']]
 	send_target_piles.emit(target_piles)
+
+func animate_card(card:Card, from:Vector2, destination:Vector2) -> float:
+	card.z_index = ordering_temp
+	card.position = from
+	var animation_time:float = .34
+	var tween:Tween = create_tween()
+	tween.set_ease(Tween.EASE_OUT)
+	tween.tween_property(card, "position",destination, animation_time)
+	#await tween.finished
+	return animation_time
