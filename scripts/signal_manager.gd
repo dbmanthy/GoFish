@@ -17,7 +17,11 @@ func _ready() -> void:
 	$Opponent.request_target_piles.connect($Dealer.show_target_piles)
 	$Dealer.send_target_piles.connect($Opponent.populate_target_piles)
 
+	$Opponent.move_card.connect($Dealer.manuel_move_card)
 	$Dealer.shared_piles_changed.connect($Opponent.look_at_cards)
-	$Opponent.move_card.connect($Dealer.move_opponent_card)
 
+	$Opponent.no_available_move.connect($Dealer.opponent_stuck)
 	$Dealer.move_made.connect($Opponent.move_complete)
+
+	$Opponent.opponent_won.connect($Dealer.round_won)
+	$Dealer.game_winnable.connect($Opponent.set_game_winnable)

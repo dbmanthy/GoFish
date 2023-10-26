@@ -7,6 +7,7 @@ signal send_target_piles
 signal shared_piles_changed
 signal move_made
 signal card_animation_complete
+signal game_winnable
 
 const card_scene := preload("res://Scenes/card.tscn")
 const pile_scene := preload("res://Scenes/play_pile.tscn")
@@ -19,12 +20,14 @@ var held_card:Card
 var holding_card:bool = false
 var stuck:bool = false
 
+var opponent_is_stuck:bool = false
+var win_state:bool = false
+
 var card_half_size:Vector2
 var card_scaler:float = 1
 var play_area_req_dims:Vector2 = Vector2(6,5.5)
 
 var ordering_temp:int = 0
-
 
 func _ready() -> void:
 	create_deck()
@@ -75,16 +78,25 @@ func create_play_piles() -> void:
 
 func card_interact(mouse_position:Vector2) -> void:
 	if target_pile:
-		if !holding_card and target_pile.has_cards() and !target_pile.opponent_pile:
+		if !holding_card and target_pile.has_cards():
 			#added additional if statemtn to idicate game rules vs game lagic, could find a better way to decouple this
-			if target_pile.stack_type != 'messy':
-				held_card = target_pile.pop_card()
-				held_card.reveale_card()
-				ordering_temp += 1
-				held_card.z_index = ordering_temp
-				holding_card = true
-				if target_pile.stack_type == 'clean':
-					stuck = true
+			match target_pile.stack_type:
+				'stacked':
+					if  !target_pile.opponent_pile:
+						held_card = target_pile.pop_card()
+						held_card.reveale_card()
+						ordering_temp += 1
+						held_card.z_index = ordering_temp
+						holding_card = true
+				'clean':
+					if  !target_pile.opponent_pile:
+						stuck = true
+						unstick_game()
+				'messy':
+					print('clicked when win state ' + str(win_state))
+					if win_state:
+						round_won('PLAYER')
+
 		elif holding_card:
 			#added additional if statemtn to idicate game rules vs game lagic, could find a better way to decouple this
 			if target_pile.stack.size() == 0 and target_pile.stack_type != 'clean' and !stuck:
@@ -101,23 +113,27 @@ func card_interact(mouse_position:Vector2) -> void:
 							if stuck:
 								stuck = false
 							shared_piles_changed.emit()
+							win_state = in_win_state()
+							if win_state:
+								game_winnable.emit()
 					'stacked':
 						if held_card.value_to_int() == target_pile.top_card.value_to_int() and !stuck:
 							target_pile.add_card(held_card)
 							holding_card = false
 							held_card = null
 
-func move_opponent_card(from_pile:PlayPile, to_pile:PlayPile):
+func manuel_move_card(from_pile:PlayPile, to_pile:PlayPile):
 	var in_flight_card:Card = from_pile.pop_card()
 	var from_position:Vector2 = in_flight_card.position
 	to_pile.add_card(in_flight_card)
 	animate_card(in_flight_card, from_position, in_flight_card.position)
-	if from_pile.has_cards():
+	if from_pile.has_cards() and from_pile.stack_type != 'clean':
 		from_pile.stack.front().reveale_card()
 	var rng:RandomNumberGenerator = RandomNumberGenerator.new()
 	await get_tree().create_timer(rng.randf_range(0,3.2)).timeout# opponents "think time"
 	to_pile.set_card_display_order()
 	move_made.emit()
+	win_state = in_win_state()
 
 func move_card() -> void:
 	if held_card and holding_card:
@@ -186,6 +202,7 @@ func shuffle_deck(deck:Array) -> Array:
 		deck[j] = temp
 	return deck
 
+#todo ajsut set_up_game for varying card numbers ie player_card_count:int, opponent_card_count:int
 func set_up_game() -> void:
 	clear_game()
 	var temp_cards:Array = [] + shuffle_deck(cards)
@@ -217,6 +234,16 @@ func set_up_game() -> void:
 	play_piles['player_pile'].add_card(temp_cards.pop_front())
 	play_piles['player_pile'].top_card.reveale_card()
 
+func unstick_game():
+	stuck = false
+	if opponent_is_stuck:
+		if play_piles['opponent_deck'].has_cards():
+			play_piles['opponent_deck'].top_card.reveale_card()
+			manuel_move_card(play_piles['opponent_deck'], play_piles['opponent_pile'],)
+		if play_piles['player_deck'].has_cards():
+			play_piles['player_deck'].top_card.reveale_card()
+			manuel_move_card(play_piles['player_deck'], play_piles['player_pile'],)
+		#todo animate_card()
 
 func set_target_pile(target:PlayPile) -> void:
 	target_pile = target
@@ -245,3 +272,24 @@ func animate_card(card:Card, from:Vector2, destination:Vector2) -> float:
 	tween.tween_property(card, "position",destination, animation_time)
 	#await tween.finished
 	return animation_time
+
+func opponent_stuck(stuck:bool) -> void:
+	opponent_is_stuck = stuck
+
+func in_win_state() -> bool:
+	var player_in_win_state:bool = true
+	var player_solatare = [play_piles['player_sol_one'],play_piles['player_sol_two'],play_piles['player_sol_three'],play_piles['player_sol_four'],play_piles['player_sol_five']]
+	for pile in player_solatare:
+		if pile.has_cards():
+			player_in_win_state = false
+
+	var opponent_in_win_state:bool = true
+	var opponent_solatare = [play_piles['opponent_sol_one'],play_piles['opponent_sol_two'],play_piles['opponent_sol_three'],play_piles['opponent_sol_four'],play_piles['opponent_sol_five']]
+	for pile in opponent_solatare:
+		if pile.has_cards():
+			opponent_in_win_state = false
+
+	return player_in_win_state or opponent_in_win_state
+
+func round_won(player:String) -> void:
+	print(player +' WON')
