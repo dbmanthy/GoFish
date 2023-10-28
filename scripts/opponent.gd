@@ -14,9 +14,9 @@ var play_piles:Dictionary
 var target_piles:Dictionary
 var stackable_piles:Dictionary
 var empty_piles:Array
+var multicard_stacks:Array
 var remaining_cards:int
 var making_move:bool = false
-var multicard_stacks:bool = true
 var game_winnable:bool = false
 
 func _process(delta: float) -> void:
@@ -31,7 +31,7 @@ func find_move() -> bool:
 				send_stuck_state(false)
 				#print('center move')
 				return true
-		if empty_piles.size() > 0 and multicard_stacks:
+		if empty_piles.size() > 0 and multicard_stacks.size() != 0 and play_piles[card_val].stack.size() > 1:
 			initiate_move_card(play_piles[card_val],empty_piles[0])
 			send_stuck_state(false)
 			#print('solitare move')
@@ -40,6 +40,7 @@ func find_move() -> bool:
 			initiate_move_card(play_piles[card_val],stackable_piles[card_val])
 			send_stuck_state(false)
 			#print('stack move')
+			#todo after takeing off card if next card is of the same value move it as well?
 			return true
 	send_stuck_state(true)
 	return false
@@ -55,8 +56,8 @@ func populate_playable_piles(playable_piles:Array) -> void:
 	empty_piles.clear()
 	stackable_piles.clear()
 	play_piles.clear()
+	multicard_stacks.clear()
 	remaining_cards = 0
-	multicard_stacks = false
 	for pile in playable_piles:
 		if pile.has_cards():
 			if int(pile.stack.front().value_to_int()) in play_piles.keys():
@@ -67,7 +68,7 @@ func populate_playable_piles(playable_piles:Array) -> void:
 		else:
 			empty_piles.append(pile)
 		if pile.stack.size() > 1:
-			multicard_stacks = true
+			multicard_stacks.append(pile)
 	if remaining_cards == 0:
 		set_game_winnable()
 
@@ -77,7 +78,10 @@ func get_target_piles() -> void:
 func populate_target_piles(targeted_piles:Array) -> void:
 	target_piles.clear()
 	for pile in targeted_piles:
-		target_piles[int(pile.stack.front().value_to_int())] = pile
+		if pile.has_cards():
+			target_piles[int(pile.stack.front().value_to_int())] = pile
+		else:
+			target_piles[-100]= pile
 
 func send_stuck_state(stuck:bool) -> void:
 	no_available_move.emit(stuck)
@@ -107,4 +111,19 @@ func move_complete() -> void:
 
 func set_game_winnable() -> void:
 	await get_tree().create_timer(1.5).timeout #slap time
-	opponent_won.emit('OPPONENT')
+	opponent_won.emit('OPPONENT', slap_pile())
+
+func slap_pile() -> PlayPile:
+	var rng:RandomNumberGenerator = RandomNumberGenerator.new()
+	var big_pile:PlayPile = target_piles[0]
+	var little_pile:PlayPile = target_piles[1]
+
+	if big_pile.stack.size() < little_pile.stack.size():
+		big_pile = target_piles[1]
+		little_pile = target_piles[0]
+
+	var pick:float = little_pile.stack.size()/big_pile.stack.size()
+
+	if rng.randf() > pick:
+		return little_pile
+	return big_pile

@@ -34,7 +34,7 @@ func _ready() -> void:
 	card_half_size = cards[0].card_size()/2
 	create_play_piles()
 	set_play_area()
-	set_up_game()
+	set_up_game(6,46)
 
 func _process(delta: float) -> void:
 	move_card()
@@ -78,11 +78,11 @@ func create_play_piles() -> void:
 
 func card_interact(mouse_position:Vector2) -> void:
 	if target_pile:
-		if !holding_card and target_pile.has_cards():
+		if !holding_card:
 			#added additional if statemtn to idicate game rules vs game lagic, could find a better way to decouple this
 			match target_pile.stack_type:
 				'stacked':
-					if  !target_pile.opponent_pile:
+					if  !target_pile.opponent_pile and target_pile.has_cards():
 						held_card = target_pile.pop_card()
 						held_card.reveale_card()
 						ordering_temp += 1
@@ -95,7 +95,7 @@ func card_interact(mouse_position:Vector2) -> void:
 				'messy':
 					print('clicked when win state ' + str(win_state))
 					if win_state:
-						round_won('PLAYER')
+						round_won('PLAYER', target_pile)
 
 		elif holding_card:
 			#added additional if statemtn to idicate game rules vs game lagic, could find a better way to decouple this
@@ -202,46 +202,62 @@ func shuffle_deck(deck:Array) -> Array:
 		deck[j] = temp
 	return deck
 
-#todo ajsut set_up_game for varying card numbers irplayer_card_count:int, opponent_card_count:int
-func set_up_game() -> void:
+#todo ajsut set_up_game for varying card numbers
+func set_up_game(player_card_count:int, opponent_card_count:int) -> void:
+	assert(player_card_count + opponent_card_count == 52, 'player and opponent cards do not add up to 52')
 	clear_game()
+	held_card = null
+	holding_card = false
 	var temp_cards:Array = [] + shuffle_deck(cards)
+	for card in temp_cards:
+		card.hide_card()
 
 	var opponent_solatare = [play_piles['opponent_sol_one'],play_piles['opponent_sol_two'],play_piles['opponent_sol_three'],play_piles['opponent_sol_four'],play_piles['opponent_sol_five']]
-	var card_count:int = 5
-	for pile in opponent_solatare:
-		for i in range(card_count):
-			pile.add_card(temp_cards.pop_front())
-		card_count -= 1
-		pile.top_card.reveale_card()
+	while opponent_solatare.size() > 0:
+		for pile in opponent_solatare:
+				if opponent_card_count > 0:
+					pile.add_card(temp_cards.pop_front())
+					opponent_card_count -= 1
+		var complete_pile:PlayPile = opponent_solatare.pop_front()
+		complete_pile.top_card.reveale_card()
 
 	var player_solatare = [play_piles['player_sol_one'],play_piles['player_sol_two'],play_piles['player_sol_three'],play_piles['player_sol_four'],play_piles['player_sol_five']]
-	card_count = 1
-	for pile in player_solatare:
-		for i in range(card_count):
-			pile.add_card(temp_cards.pop_front())
-		card_count += 1
-		pile.top_card.reveale_card()
+	while player_solatare.size() > 0:
+		for pile in player_solatare:
+				if player_card_count > 0:
+					pile.add_card(temp_cards.pop_front())
+					player_card_count -= 1
+		var complete_pile:PlayPile = player_solatare.pop_front()
+		complete_pile.top_card.reveale_card()
 
-	for i in range(temp_cards.size() - 2):
-		if i%2 == 0:
-			play_piles['opponent_deck'].add_card(temp_cards.pop_front())
-		else:
-			play_piles['player_deck'].add_card(temp_cards.pop_front())
+	if opponent_card_count >= 1:
+		play_piles['opponent_pile'].add_card(temp_cards.pop_front())
+		play_piles['opponent_pile'].top_card.reveale_card()
+		opponent_card_count -= 1
 
-	play_piles['opponent_pile'].add_card(temp_cards.pop_front())
-	play_piles['opponent_pile'].top_card.reveale_card()
-	play_piles['player_pile'].add_card(temp_cards.pop_front())
-	play_piles['player_pile'].top_card.reveale_card()
+	if player_card_count >= 1:
+		play_piles['player_pile'].add_card(temp_cards.pop_front())
+		play_piles['player_pile'].top_card.reveale_card()
+		player_card_count -= 1
+
+	while opponent_card_count > 0:
+		play_piles['opponent_deck'].add_card(temp_cards.pop_front())
+		opponent_card_count -= 1
+
+	while player_card_count > 0:
+		play_piles['player_deck'].add_card(temp_cards.pop_front())
+		player_card_count -= 1
+
+	assert(temp_cards.size() == 0, 'none 0 number of card remaining. Remaining cards ' + str(temp_cards.size()))
 
 func unstick_game():
 	stuck = false
 	if opponent_is_stuck:
 		if play_piles['opponent_deck'].has_cards():
-			play_piles['opponent_deck'].top_card.reveale_card()
+			play_piles['opponent_deck'].stack.front().reveale_card()
 			manuel_move_card(play_piles['opponent_deck'], play_piles['opponent_pile'],)
 		if play_piles['player_deck'].has_cards():
-			play_piles['player_deck'].top_card.reveale_card()
+			play_piles['player_deck'].stack.front().reveale_card()
 			manuel_move_card(play_piles['player_deck'], play_piles['player_pile'],)
 		#todo animate_card()
 
@@ -291,13 +307,32 @@ func in_win_state() -> bool:
 
 	return player_in_win_state or opponent_in_win_state
 
-func round_won(player:String) -> void:
-	print(player +' WON')
-	set_up_game(tally_cards(false), tally_cards(true))
+func round_won(winner:String, slapped_pile:PlayPile) -> void:
+	print(winner +' WON')
+	var opp_pile:PlayPile
+	var plr_pile:PlayPile
+	var remaining_pile = play_piles['opponent_pile'] if slapped_pile == play_piles['player_pile'] else play_piles['player_pile']
 
-func tally_cards(is_opponent_pile:bool) -> int:
+	if winner == 'opponent':
+		opp_pile = slapped_pile
+		plr_pile = remaining_pile
+	else:
+		plr_pile = slapped_pile
+		opp_pile = remaining_pile
+
+	set_up_game(tally_cards(false, plr_pile), tally_cards(true, opp_pile))
+
+func tally_cards(is_opponent_pile:bool, result_pile:PlayPile) -> int:
 	var card_tally:int = 0
-	for pile in play_piles:
+	for pile in play_piles.values():
 		if pile.opponent_pile == is_opponent_pile:
 			card_tally += pile.stack.size()
+
+	if is_opponent_pile:
+		card_tally -= play_piles['opponent_pile']
+	else:
+		card_tally -= play_piles['player_pile']
+
+	card_tally += result_pile.stack.size()
+
 	return card_tally
