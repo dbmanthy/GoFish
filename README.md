@@ -1,5 +1,5 @@
 # Speed
-A quick and dirty project to learn godot and gdScript
+A quick and dirty project to learn Godot and gdScript. See playable demo https://dbmanthy.itch.io/speed
 
 Rules of speed (more or less):
 
