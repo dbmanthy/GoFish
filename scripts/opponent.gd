@@ -7,6 +7,7 @@ signal request_target_piles
 signal move_card
 signal no_available_move
 signal opponent_won
+signal game_winnable
 
 var held_card:Card
 
@@ -17,7 +18,6 @@ var empty_piles:Array
 var multicard_stacks:Array
 var remaining_cards:int
 var making_move:bool = false
-var game_winnable:bool = false
 
 func _process(delta: float) -> void:
 	if !making_move:
@@ -26,21 +26,20 @@ func _process(delta: float) -> void:
 func find_move() -> bool:
 	for card_val in play_piles.keys():
 		for target_val in target_piles.keys():
-			if abs(card_val - target_val) == 1 or abs(card_val - target_val) >= 12:
+			if target_piles[target_val].has_cards() and (abs(card_val - target_val) == 1 or abs(card_val - target_val) >= 12):
 				initiate_move_card(play_piles[card_val],target_piles[target_val])
 				send_stuck_state(false)
 				#print('center move')
 				return true
-		if empty_piles.size() > 0 and multicard_stacks.size() != 0 and play_piles[card_val].stack.size() > 1:
+		if !solid_stack(play_piles[card_val]) and empty_piles.size() > 0 and multicard_stacks.size() != 0 and play_piles[card_val].stack.size() > 1:
 			initiate_move_card(play_piles[card_val],empty_piles[0])
 			send_stuck_state(false)
 			#print('solitare move')
 			return true
-		if card_val in stackable_piles.keys() and remaining_cards > 5:
+		if !solid_stack(play_piles[card_val]) and card_val in stackable_piles.keys() and remaining_cards > 5:
 			initiate_move_card(play_piles[card_val],stackable_piles[card_val])
 			send_stuck_state(false)
 			#print('stack move')
-			#todo after takeing off card if next card is of the same value move it as well?
 			return true
 	send_stuck_state(true)
 	return false
@@ -70,6 +69,7 @@ func populate_playable_piles(playable_piles:Array) -> void:
 		if pile.stack.size() > 1:
 			multicard_stacks.append(pile)
 	if remaining_cards == 0:
+		game_winnable.emit()
 		set_game_winnable()
 
 func get_target_piles() -> void:
@@ -115,15 +115,24 @@ func set_game_winnable() -> void:
 
 func slap_pile() -> PlayPile:
 	var rng:RandomNumberGenerator = RandomNumberGenerator.new()
-	var big_pile:PlayPile = target_piles[0]
-	var little_pile:PlayPile = target_piles[1]
+	var big_pile:PlayPile = target_piles.values()[0]
+	var little_pile:PlayPile = target_piles.values()[1]
 
 	if big_pile.stack.size() < little_pile.stack.size():
-		big_pile = target_piles[1]
-		little_pile = target_piles[0]
+		big_pile = target_piles.values()[1]
+		little_pile = target_piles.values()[0]
 
 	var pick:float = little_pile.stack.size()/big_pile.stack.size()
 
 	if rng.randf() > pick:
 		return little_pile
 	return big_pile
+
+func solid_stack(pile:PlayPile) -> bool:
+	if !pile.has_cards() or pile.stack.size() == 1:
+		return false
+	var pile_val = pile.stack.front().value_to_int()
+	for card in pile.stack:
+		if card.value_to_int() != pile_val or !card.revealed:
+			return false
+	return true

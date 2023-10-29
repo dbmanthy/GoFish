@@ -22,19 +22,22 @@ var stuck:bool = false
 
 var opponent_is_stuck:bool = false
 var win_state:bool = false
+var round_win_recorded:bool = false
 
 var card_half_size:Vector2
 var card_scaler:float = 1
 var play_area_req_dims:Vector2 = Vector2(6,5.5)
 
 var ordering_temp:int = 0
+var difficulty_scalar:float = 0
+var difficutly_scalar_bounds:Vector2 = Vector2(0,3)
 
 func _ready() -> void:
 	create_deck()
 	card_half_size = cards[0].card_size()/2
 	create_play_piles()
 	set_play_area()
-	set_up_game(6,46)
+	set_up_game(26,26)
 
 func _process(delta: float) -> void:
 	move_card()
@@ -93,34 +96,31 @@ func card_interact(mouse_position:Vector2) -> void:
 						stuck = true
 						unstick_game()
 				'messy':
-					print('clicked when win state ' + str(win_state))
+					print('slapped when win state ' + str(win_state))
 					if win_state:
 						round_won('PLAYER', target_pile)
 
 		elif holding_card:
-			#added additional if statemtn to idicate game rules vs game lagic, could find a better way to decouple this
-			if target_pile.stack.size() == 0 and target_pile.stack_type != 'clean' and !stuck:
-				target_pile.add_card(held_card)
-				holding_card = false
-				held_card = null
-			else:
-				match target_pile.stack_type:
-					'messy':
-						if abs(held_card.value_to_int() - target_pile.top_card.value_to_int()) == 1 or abs(held_card.value_to_int() - target_pile.top_card.value_to_int()) >= 12 or stuck:
-							target_pile.add_card(held_card)
-							holding_card = false
-							held_card = null
-							if stuck:
-								stuck = false
-							shared_piles_changed.emit()
-							win_state = in_win_state()
-							if win_state:
-								game_winnable.emit()
-					'stacked':
-						if held_card.value_to_int() == target_pile.top_card.value_to_int() and !stuck:
-							target_pile.add_card(held_card)
-							holding_card = false
-							held_card = null
+			match target_pile.stack_type:
+				'clean':
+					pass
+				'messy':
+					if target_pile.has_cards() and (abs(held_card.value_to_int() - target_pile.top_card.value_to_int()) == 1 or abs(held_card.value_to_int() - target_pile.top_card.value_to_int()) >= 12 or stuck):
+						target_pile.add_card(held_card)
+						holding_card = false
+						held_card = null
+						if stuck:
+							stuck = false
+						shared_piles_changed.emit()
+						round_win_recorded = false
+						win_state = in_win_state()
+						if win_state:
+							game_winnable.emit()
+				'stacked':
+					if !target_pile.has_cards() or (held_card.value_to_int() == target_pile.top_card.value_to_int() and !stuck):
+						target_pile.add_card(held_card)
+						holding_card = false
+						held_card = null
 
 func manuel_move_card(from_pile:PlayPile, to_pile:PlayPile):
 	var in_flight_card:Card = from_pile.pop_card()
@@ -129,8 +129,11 @@ func manuel_move_card(from_pile:PlayPile, to_pile:PlayPile):
 	animate_card(in_flight_card, from_position, in_flight_card.position)
 	if from_pile.has_cards() and from_pile.stack_type != 'clean':
 		from_pile.stack.front().reveale_card()
+	#negative feedback loop
+	difficulty_scalar = 0.1 * (tally_cards(false, play_piles['player_pile']) - tally_cards(true, play_piles['player_pile']))
+	difficulty_scalar = clamp(difficulty_scalar, difficutly_scalar_bounds.x, difficutly_scalar_bounds.y)
 	var rng:RandomNumberGenerator = RandomNumberGenerator.new()
-	await get_tree().create_timer(rng.randf_range(0,3.2)).timeout# opponents "think time"
+	await get_tree().create_timer(rng.randf_range(0 + difficulty_scalar,3.2 +  difficulty_scalar)).timeout# opponents "think time"
 	to_pile.set_card_display_order()
 	move_made.emit()
 	win_state = in_win_state()
@@ -208,6 +211,13 @@ func set_up_game(player_card_count:int, opponent_card_count:int) -> void:
 	clear_game()
 	held_card = null
 	holding_card = false
+	#positive feed back loop to counter
+	if player_card_count <= 19:
+		difficutly_scalar_bounds = Vector2(2,2)
+	elif opponent_card_count <= 14:
+		difficutly_scalar_bounds = Vector2(0,1)
+	else:
+		difficutly_scalar_bounds = Vector2(0,3)
 	var temp_cards:Array = [] + shuffle_deck(cards)
 	for card in temp_cards:
 		card.hide_card()
@@ -308,19 +318,22 @@ func in_win_state() -> bool:
 	return player_in_win_state or opponent_in_win_state
 
 func round_won(winner:String, slapped_pile:PlayPile) -> void:
-	print(winner +' WON')
-	var opp_pile:PlayPile
-	var plr_pile:PlayPile
-	var remaining_pile = play_piles['opponent_pile'] if slapped_pile == play_piles['player_pile'] else play_piles['player_pile']
+	if !round_win_recorded:
+		round_win_recorded = true
+		win_state = false
+		print(winner +' WON')
+		var opp_pile:PlayPile
+		var plr_pile:PlayPile
+		var remaining_pile = play_piles['opponent_pile'] if slapped_pile == play_piles['player_pile'] else play_piles['player_pile']
+		print('slapped pile size ' + str(slapped_pile.stack.size()) + ' vs ' + str(remaining_pile.stack.size()))
+		if winner == 'OPPONENT':
+			opp_pile = slapped_pile
+			plr_pile = remaining_pile
+		else:
+			plr_pile = slapped_pile
+			opp_pile = remaining_pile
 
-	if winner == 'opponent':
-		opp_pile = slapped_pile
-		plr_pile = remaining_pile
-	else:
-		plr_pile = slapped_pile
-		opp_pile = remaining_pile
-
-	set_up_game(tally_cards(false, plr_pile), tally_cards(true, opp_pile))
+		set_up_game(tally_cards(false, plr_pile), tally_cards(true, opp_pile))
 
 func tally_cards(is_opponent_pile:bool, result_pile:PlayPile) -> int:
 	var card_tally:int = 0
@@ -329,10 +342,13 @@ func tally_cards(is_opponent_pile:bool, result_pile:PlayPile) -> int:
 			card_tally += pile.stack.size()
 
 	if is_opponent_pile:
-		card_tally -= play_piles['opponent_pile']
+		card_tally -= play_piles['opponent_pile'].stack.size()
 	else:
-		card_tally -= play_piles['player_pile']
+		card_tally -= play_piles['player_pile'].stack.size()
 
 	card_tally += result_pile.stack.size()
 
 	return card_tally
+
+func opponent_trigger_win_state():
+	win_state = true

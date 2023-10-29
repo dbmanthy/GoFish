@@ -25,3 +25,5 @@ func _ready() -> void:
 
 	$Opponent.opponent_won.connect($Dealer.round_won)
 	$Dealer.game_winnable.connect($Opponent.set_game_winnable)
+
+	$Opponent.game_winnable.connect($Dealer.opponent_trigger_win_state)

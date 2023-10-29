@@ -18,6 +18,7 @@ func populate_card(value:String, suit:String) -> Card:
 	return self
 
 func reveale_card() -> void:
+	revealed = true
 	if suit in ['♤','♧']:
 		$CardOutter/CardColor.color = Color("#262626")
 	else:
@@ -32,6 +33,7 @@ func reveale_card() -> void:
 	$CardOutter/CardInner/Number/Label.text = suit+value
 
 func hide_card() -> void:
+	revealed = false
 	$CardOutter/CardColor.color = Color("#265cc0")
 
 	$CardOutter/CardInner/TopSymbols/NumberLeft.text = ' ?'
